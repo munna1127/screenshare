@@ -3,9 +3,12 @@ const socket = io();
 const params = new URLSearchParams(window.location.search);
 const room = params.get("room");
 
+document.getElementById("roomId").innerText = "Room ID: " + room;
+
 let localStream;
 let peers = {};
 let isMuted = false;
+let cameraOn = true;
 
 socket.emit("join-room", room);
 
@@ -87,6 +90,7 @@ function addVideo(stream, id) {
     video = document.createElement("video");
     video.id = id;
     video.autoplay = true;
+    video.muted = id === "me";
     document.getElementById("videos").appendChild(video);
   }
 
@@ -108,30 +112,52 @@ async function startCamera() {
   }
 }
 
+function toggleCamera() {
+  cameraOn = !cameraOn;
+
+  localStream.getVideoTracks().forEach(track => {
+    track.enabled = cameraOn;
+  });
+
+  document.getElementById("camBtn").innerText =
+    cameraOn ? "❌ Camera OFF" : "🎥 Camera ON";
+}
+
 function toggleMute() {
   isMuted = !isMuted;
 
   localStream.getAudioTracks().forEach(track => {
     track.enabled = !isMuted;
   });
+
+  document.getElementById("micBtn").innerText =
+    isMuted ? "🔇 Mic OFF" : "🎤 Mic ON";
 }
 
 async function startShare() {
-  localStream = await navigator.mediaDevices.getDisplayMedia({
+  const screenStream = await navigator.mediaDevices.getDisplayMedia({
     video: true
   });
 
-  addVideo(localStream, "me");
+  const screenTrack = screenStream.getVideoTracks()[0];
 
   for (let id in peers) {
-    localStream.getTracks().forEach(track => {
-      peers[id].addTrack(track, localStream);
-    });
+    const sender = peers[id]
+      .getSenders()
+      .find(s => s.track.kind === "video");
+
+    if (sender) sender.replaceTrack(screenTrack);
   }
+
+  addVideo(screenStream, "me");
+
+  screenTrack.onended = () => {
+    startCamera();
+  };
 }
 
 function sendMessage() {
   const input = document.getElementById("msgInput");
   socket.emit("chat", input.value);
   input.value = "";
-}
+    }
