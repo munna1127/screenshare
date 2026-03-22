@@ -7,12 +7,14 @@
 <body>
 
 <h2>💬 Video Room</h2>
+<p id="roomId"></p>
 
 <div id="videos" class="video-grid"></div>
 
 <div class="controls">
   <button onclick="startCamera()">🎥 Camera</button>
-  <button onclick="toggleMute()">🎤 Mute</button>
+  <button onclick="toggleCamera()" id="camBtn">❌ Camera OFF</button>
+  <button onclick="toggleMute()" id="micBtn">🎤 Mic ON</button>
   <button onclick="startShare()">📺 Share</button>
 </div>
 
