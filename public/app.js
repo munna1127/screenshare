@@ -3,7 +3,8 @@ const socket = io();
 const params = new URLSearchParams(window.location.search);
 const room = params.get("room");
 
-document.getElementById("roomId").innerText = "Room ID: " + room;
+const roomText = document.getElementById("roomId");
+if (roomText) roomText.innerText = "Room ID: " + room;
 
 let peers = {};
 let videoTrack = null;
@@ -14,10 +15,10 @@ let cameraOn = true;
 
 socket.emit("join-room", room);
 
-// 🔥 auto start camera (mobile fix)
-window.onload = () => {
+// safe camera start
+setTimeout(() => {
   startCamera();
-};
+}, 1000);
 
 socket.on("user-joined", userId => {
   createPeer(userId, true);
@@ -67,9 +68,6 @@ function createPeer(userId, initiator) {
 
   peers[userId] = peer;
 
-  if (videoTrack) peer.addTrack(videoTrack);
-  if (audioTrack) peer.addTrack(audioTrack);
-
   peer.onicecandidate = e => {
     if (e.candidate) {
       socket.emit("signal", {
@@ -82,6 +80,9 @@ function createPeer(userId, initiator) {
   peer.ontrack = e => {
     addVideo(e.streams[0], userId);
   };
+
+  if (videoTrack) peer.addTrack(videoTrack);
+  if (audioTrack) peer.addTrack(audioTrack);
 
   if (initiator) {
     peer.createOffer().then(offer => {
@@ -108,56 +109,48 @@ function addVideo(stream, id) {
   video.srcObject = stream;
 }
 
-// 🎥 CAMERA
 async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: true,
-    audio: true
-  });
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    });
 
-  videoTrack = stream.getVideoTracks()[0];
-  audioTrack = stream.getAudioTracks()[0];
+    videoTrack = stream.getVideoTracks()[0];
+    audioTrack = stream.getAudioTracks()[0];
 
-  const newStream = new MediaStream([videoTrack, audioTrack]);
-  addVideo(newStream, "me");
+    const newStream = new MediaStream([videoTrack, audioTrack]);
+    addVideo(newStream, "me");
 
-  for (let id in peers) {
-    const senders = peers[id].getSenders();
+    for (let id in peers) {
+      const senders = peers[id].getSenders();
 
-    const v = senders.find(s => s.track?.kind === "video");
-    const a = senders.find(s => s.track?.kind === "audio");
+      const v = senders.find(s => s.track?.kind === "video");
+      const a = senders.find(s => s.track?.kind === "audio");
 
-    if (v) v.replaceTrack(videoTrack);
-    else peers[id].addTrack(videoTrack, newStream);
+      if (v) v.replaceTrack(videoTrack);
+      else peers[id].addTrack(videoTrack, newStream);
 
-    if (a) a.replaceTrack(audioTrack);
-    else peers[id].addTrack(audioTrack, newStream);
+      if (a) a.replaceTrack(audioTrack);
+      else peers[id].addTrack(audioTrack, newStream);
+    }
+  } catch (err) {
+    alert("Camera permission required");
   }
 }
 
-// 🎥 CAMERA TOGGLE
 function toggleCamera() {
   if (!videoTrack) return;
-
   cameraOn = !cameraOn;
   videoTrack.enabled = cameraOn;
-
-  document.getElementById("camBtn").innerText =
-    cameraOn ? "❌ Camera OFF" : "🎥 Camera ON";
 }
 
-// 🎤 MIC
 function toggleMute() {
   if (!audioTrack) return;
-
   isMuted = !isMuted;
   audioTrack.enabled = !isMuted;
-
-  document.getElementById("micBtn").innerText =
-    isMuted ? "🔇 Mic OFF" : "🎤 Mic ON";
 }
 
-// 📺 SCREEN SHARE
 async function startShare() {
   if (!navigator.mediaDevices.getDisplayMedia) {
     alert("Screen share not supported on mobile");
@@ -187,9 +180,8 @@ async function startShare() {
   };
 }
 
-// 💬 CHAT
 function sendMessage() {
   const input = document.getElementById("msgInput");
   socket.emit("chat", input.value);
   input.value = "";
-               }
+  }
