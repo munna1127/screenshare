@@ -6,15 +6,19 @@
 </head>
 <body>
 
-<h2 class="title">🚀 Tomar Ji Live Room</h2>
+<h2 class="title">🚀 Tomar Ji Room</h2>
+
 <p id="roomId"></p>
+<p id="status">🟡 Connecting...</p>
+
+<button onclick="copyLink()">🔗 Copy Link</button>
 
 <div id="videos" class="video-grid"></div>
 
 <div class="controls glass">
   <button onclick="startCamera()">🎥 Camera</button>
-  <button onclick="toggleCamera()" id="camBtn">❌ Camera OFF</button>
-  <button onclick="toggleMute()" id="micBtn">🎤 Mic ON</button>
+  <button onclick="toggleCamera()">📷 Toggle Cam</button>
+  <button onclick="toggleMute()">🎤 Toggle Mic</button>
   <button onclick="startShare()">📺 Share</button>
 </div>
 
@@ -22,6 +26,11 @@
   <div id="messages"></div>
   <input id="msgInput" placeholder="Message">
   <button onclick="sendMessage()">Send</button>
+</div>
+
+<div class="glass">
+  <h3>👥 Participants</h3>
+  <ul id="users"></ul>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
