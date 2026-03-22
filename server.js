@@ -16,6 +16,16 @@ io.on("connection", socket => {
   socket.on("join-room", room => {
     socket.join(room);
 
+    // 👇 existing users bhejo (IMPORTANT FIX)
+    const users = Array.from(io.sockets.adapter.rooms.get(room) || []);
+
+    users.forEach(userId => {
+      if (userId !== socket.id) {
+        socket.emit("user-joined", userId);
+      }
+    });
+
+    // 👇 dusro ko notify karo
     socket.to(room).emit("user-joined", socket.id);
 
     socket.on("signal", ({ userId, data }) => {
