@@ -16,7 +16,6 @@ io.on("connection", socket => {
   socket.on("join-room", room => {
     socket.join(room);
 
-    // 👇 existing users bhejo (IMPORTANT FIX)
     const users = Array.from(io.sockets.adapter.rooms.get(room) || []);
 
     users.forEach(userId => {
@@ -25,7 +24,6 @@ io.on("connection", socket => {
       }
     });
 
-    // 👇 dusro ko notify karo
     socket.to(room).emit("user-joined", socket.id);
 
     socket.on("signal", ({ userId, data }) => {
