@@ -3,27 +3,33 @@ const socket = io();
 const params = new URLSearchParams(window.location.search);
 const room = params.get("room");
 
-const roomText = document.getElementById("roomId");
-if (roomText) roomText.innerText = "Room ID: " + room;
+const username = localStorage.getItem("username") || "User";
+
+document.getElementById("roomId").innerText = "Room: " + room;
 
 let peers = {};
-let videoTrack = null;
-let audioTrack = null;
+let users = {};
 
-let isMuted = false;
-let cameraOn = true;
+let videoTrack, audioTrack;
 
-socket.emit("join-room", room);
-
-// safe camera start
-setTimeout(() => {
-  startCamera();
-}, 1000);
-
-socket.on("user-joined", userId => {
-  createPeer(userId, true);
+// status
+socket.on("connect", () => {
+  document.getElementById("status").innerText = "🟢 Connected";
 });
 
+// join
+socket.emit("join-room", room);
+
+// add self
+addUser(socket.id, username);
+
+// user join
+socket.on("user-joined", userId => {
+  createPeer(userId, true);
+  addUser(userId, "User");
+});
+
+// signal
 socket.on("signal", async ({ userId, data }) => {
   if (!peers[userId]) createPeer(userId, false);
 
@@ -48,12 +54,7 @@ socket.on("signal", async ({ userId, data }) => {
   }
 });
 
-socket.on("chat", msg => {
-  const div = document.createElement("div");
-  div.innerText = msg;
-  document.getElementById("messages").appendChild(div);
-});
-
+// create peer
 function createPeer(userId, initiator) {
   const peer = new RTCPeerConnection({
     iceServers: [
@@ -68,6 +69,11 @@ function createPeer(userId, initiator) {
 
   peers[userId] = peer;
 
+  if (videoTrack) peer.addTrack(videoTrack);
+  if (audioTrack) peer.addTrack(audioTrack);
+
+  peer.ontrack = e => addVideo(e.streams[0], userId);
+
   peer.onicecandidate = e => {
     if (e.candidate) {
       socket.emit("signal", {
@@ -76,13 +82,6 @@ function createPeer(userId, initiator) {
       });
     }
   };
-
-  peer.ontrack = e => {
-    addVideo(e.streams[0], userId);
-  };
-
-  if (videoTrack) peer.addTrack(videoTrack);
-  if (audioTrack) peer.addTrack(audioTrack);
 
   if (initiator) {
     peer.createOffer().then(offer => {
@@ -95,6 +94,7 @@ function createPeer(userId, initiator) {
   }
 }
 
+// video
 function addVideo(stream, id) {
   let video = document.getElementById(id);
 
@@ -102,86 +102,77 @@ function addVideo(stream, id) {
     video = document.createElement("video");
     video.id = id;
     video.autoplay = true;
-    video.muted = id === "me";
+    video.onclick = () => video.requestFullscreen();
     document.getElementById("videos").appendChild(video);
   }
 
   video.srcObject = stream;
 }
 
+// camera
 async function startCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    });
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: true,
+    audio: true
+  });
 
-    videoTrack = stream.getVideoTracks()[0];
-    audioTrack = stream.getAudioTracks()[0];
+  videoTrack = stream.getVideoTracks()[0];
+  audioTrack = stream.getAudioTracks()[0];
 
-    const newStream = new MediaStream([videoTrack, audioTrack]);
-    addVideo(newStream, "me");
-
-    for (let id in peers) {
-      const senders = peers[id].getSenders();
-
-      const v = senders.find(s => s.track?.kind === "video");
-      const a = senders.find(s => s.track?.kind === "audio");
-
-      if (v) v.replaceTrack(videoTrack);
-      else peers[id].addTrack(videoTrack, newStream);
-
-      if (a) a.replaceTrack(audioTrack);
-      else peers[id].addTrack(audioTrack, newStream);
-    }
-  } catch (err) {
-    alert("Camera permission required");
-  }
+  addVideo(new MediaStream([videoTrack, audioTrack]), "me");
 }
 
+// toggle
 function toggleCamera() {
-  if (!videoTrack) return;
-  cameraOn = !cameraOn;
-  videoTrack.enabled = cameraOn;
+  if (videoTrack) videoTrack.enabled = !videoTrack.enabled;
 }
 
 function toggleMute() {
-  if (!audioTrack) return;
-  isMuted = !isMuted;
-  audioTrack.enabled = !isMuted;
+  if (audioTrack) audioTrack.enabled = !audioTrack.enabled;
 }
 
+// share
 async function startShare() {
   if (!navigator.mediaDevices.getDisplayMedia) {
-    alert("Screen share not supported on mobile");
+    alert("Not supported on mobile");
     return;
   }
 
-  const screenStream = await navigator.mediaDevices.getDisplayMedia({
-    video: true
-  });
+  const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+  videoTrack = stream.getVideoTracks()[0];
 
-  const screenTrack = screenStream.getVideoTracks()[0];
-  videoTrack = screenTrack;
-
-  const newStream = new MediaStream([videoTrack]);
-  addVideo(newStream, "me");
-
-  for (let id in peers) {
-    const sender = peers[id]
-      .getSenders()
-      .find(s => s.track?.kind === "video");
-
-    if (sender) sender.replaceTrack(videoTrack);
-  }
-
-  screenTrack.onended = () => {
-    startCamera();
-  };
+  addVideo(new MediaStream([videoTrack]), "me");
 }
+
+// chat
+socket.on("chat", msg => {
+  const div = document.createElement("div");
+  div.innerText = msg;
+  document.getElementById("messages").appendChild(div);
+});
 
 function sendMessage() {
   const input = document.getElementById("msgInput");
-  socket.emit("chat", input.value);
+  socket.emit("chat", username + ": " + input.value);
   input.value = "";
+}
+
+// users
+function addUser(id, name) {
+  users[id] = name;
+
+  const ul = document.getElementById("users");
+  ul.innerHTML = "";
+
+  for (let uid in users) {
+    const li = document.createElement("li");
+    li.innerText = users[uid];
+    ul.appendChild(li);
   }
+}
+
+// copy link
+function copyLink() {
+  navigator.clipboard.writeText(window.location.href);
+  alert("Link copied!");
+                  }
