@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Join Room</title>
+  <title>Screen Share App</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -9,13 +9,24 @@
 <div class="center">
   <h1>🚀 Screen Share App</h1>
 
-  <input id="room" placeholder="Enter Room ID">
-  <button onclick="join()">Join Room</button>
+  <button onclick="createRoom()">🆕 Create Room</button>
+
+  <br><br>
+
+  <input id="roomInput" placeholder="Enter Room ID">
+  <button onclick="joinRoom()">🔗 Join Room</button>
 </div>
 
 <script>
-function join() {
-  const room = document.getElementById("room").value;
+function createRoom() {
+  const roomId = Math.random().toString(36).substring(2, 8);
+  alert("Room ID: " + roomId);
+  window.location.href = "/room.html?room=" + roomId;
+}
+
+function joinRoom() {
+  const room = document.getElementById("roomInput").value;
+  if (!room) return alert("Enter Room ID");
   window.location.href = "/room.html?room=" + room;
 }
 </script>
