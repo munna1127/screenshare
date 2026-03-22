@@ -6,8 +6,6 @@ const room = params.get("room");
 document.getElementById("roomId").innerText = "Room ID: " + room;
 
 let peers = {};
-let localStream;
-
 let videoTrack = null;
 let audioTrack = null;
 
@@ -15,6 +13,11 @@ let isMuted = false;
 let cameraOn = true;
 
 socket.emit("join-room", room);
+
+// 🔥 auto start camera (mobile fix)
+window.onload = () => {
+  startCamera();
+};
 
 socket.on("user-joined", userId => {
   createPeer(userId, true);
@@ -105,6 +108,7 @@ function addVideo(stream, id) {
   video.srcObject = stream;
 }
 
+// 🎥 CAMERA
 async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: true,
@@ -114,9 +118,8 @@ async function startCamera() {
   videoTrack = stream.getVideoTracks()[0];
   audioTrack = stream.getAudioTracks()[0];
 
-  localStream = new MediaStream([videoTrack, audioTrack]);
-
-  addVideo(localStream, "me");
+  const newStream = new MediaStream([videoTrack, audioTrack]);
+  addVideo(newStream, "me");
 
   for (let id in peers) {
     const senders = peers[id].getSenders();
@@ -125,13 +128,14 @@ async function startCamera() {
     const a = senders.find(s => s.track?.kind === "audio");
 
     if (v) v.replaceTrack(videoTrack);
-    else peers[id].addTrack(videoTrack, localStream);
+    else peers[id].addTrack(videoTrack, newStream);
 
     if (a) a.replaceTrack(audioTrack);
-    else peers[id].addTrack(audioTrack, localStream);
+    else peers[id].addTrack(audioTrack, newStream);
   }
 }
 
+// 🎥 CAMERA TOGGLE
 function toggleCamera() {
   if (!videoTrack) return;
 
@@ -142,6 +146,7 @@ function toggleCamera() {
     cameraOn ? "❌ Camera OFF" : "🎥 Camera ON";
 }
 
+// 🎤 MIC
 function toggleMute() {
   if (!audioTrack) return;
 
@@ -152,7 +157,13 @@ function toggleMute() {
     isMuted ? "🔇 Mic OFF" : "🎤 Mic ON";
 }
 
+// 📺 SCREEN SHARE
 async function startShare() {
+  if (!navigator.mediaDevices.getDisplayMedia) {
+    alert("Screen share not supported on mobile");
+    return;
+  }
+
   const screenStream = await navigator.mediaDevices.getDisplayMedia({
     video: true
   });
@@ -160,8 +171,8 @@ async function startShare() {
   const screenTrack = screenStream.getVideoTracks()[0];
   videoTrack = screenTrack;
 
-  localStream = new MediaStream([videoTrack]);
-  addVideo(localStream, "me");
+  const newStream = new MediaStream([videoTrack]);
+  addVideo(newStream, "me");
 
   for (let id in peers) {
     const sender = peers[id]
@@ -176,8 +187,9 @@ async function startShare() {
   };
 }
 
+// 💬 CHAT
 function sendMessage() {
   const input = document.getElementById("msgInput");
   socket.emit("chat", input.value);
   input.value = "";
-                            }
+               }
