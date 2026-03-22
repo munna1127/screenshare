@@ -6,23 +6,25 @@
 </head>
 <body>
 
-<h2>💬 Video Room</h2>
-<p id="roomId"></p>
+<h2 class="title">🚀 Tomar Ji Live Room</h2>
+<p id="roomId" class="room"></p>
 
 <div id="videos" class="video-grid"></div>
 
-<div class="controls">
+<div class="controls glass">
   <button onclick="startCamera()">🎥 Camera</button>
   <button onclick="toggleCamera()" id="camBtn">❌ Camera OFF</button>
   <button onclick="toggleMute()" id="micBtn">🎤 Mic ON</button>
   <button onclick="startShare()">📺 Share</button>
 </div>
 
-<div class="chat">
+<div class="chat glass">
   <div id="messages"></div>
-  <input id="msgInput" placeholder="Message">
+  <input id="msgInput" placeholder="Type message...">
   <button onclick="sendMessage()">Send</button>
 </div>
+
+<p class="tag">⚡ Powered by Tomar Ji 😎</p>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="app.js"></script>
