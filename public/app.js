@@ -5,8 +5,12 @@ const room = params.get("room");
 
 document.getElementById("roomId").innerText = "Room ID: " + room;
 
-let localStream;
 let peers = {};
+let localStream;
+
+let videoTrack = null;
+let audioTrack = null;
+
 let isMuted = false;
 let cameraOn = true;
 
@@ -48,10 +52,20 @@ socket.on("chat", msg => {
 
 function createPeer(userId, initiator) {
   const peer = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      }
+    ]
   });
 
   peers[userId] = peer;
+
+  if (videoTrack) peer.addTrack(videoTrack);
+  if (audioTrack) peer.addTrack(audioTrack);
 
   peer.onicecandidate = e => {
     if (e.candidate) {
@@ -65,12 +79,6 @@ function createPeer(userId, initiator) {
   peer.ontrack = e => {
     addVideo(e.streams[0], userId);
   };
-
-  if (localStream) {
-    localStream.getTracks().forEach(track => {
-      peer.addTrack(track, localStream);
-    });
-  }
 
   if (initiator) {
     peer.createOffer().then(offer => {
@@ -98,37 +106,47 @@ function addVideo(stream, id) {
 }
 
 async function startCamera() {
-  localStream = await navigator.mediaDevices.getUserMedia({
+  const stream = await navigator.mediaDevices.getUserMedia({
     video: true,
     audio: true
   });
 
+  videoTrack = stream.getVideoTracks()[0];
+  audioTrack = stream.getAudioTracks()[0];
+
+  localStream = new MediaStream([videoTrack, audioTrack]);
+
   addVideo(localStream, "me");
 
   for (let id in peers) {
-    localStream.getTracks().forEach(track => {
-      peers[id].addTrack(track, localStream);
-    });
+    const senders = peers[id].getSenders();
+
+    const v = senders.find(s => s.track?.kind === "video");
+    const a = senders.find(s => s.track?.kind === "audio");
+
+    if (v) v.replaceTrack(videoTrack);
+    else peers[id].addTrack(videoTrack, localStream);
+
+    if (a) a.replaceTrack(audioTrack);
+    else peers[id].addTrack(audioTrack, localStream);
   }
 }
 
 function toggleCamera() {
-  cameraOn = !cameraOn;
+  if (!videoTrack) return;
 
-  localStream.getVideoTracks().forEach(track => {
-    track.enabled = cameraOn;
-  });
+  cameraOn = !cameraOn;
+  videoTrack.enabled = cameraOn;
 
   document.getElementById("camBtn").innerText =
     cameraOn ? "❌ Camera OFF" : "🎥 Camera ON";
 }
 
 function toggleMute() {
-  isMuted = !isMuted;
+  if (!audioTrack) return;
 
-  localStream.getAudioTracks().forEach(track => {
-    track.enabled = !isMuted;
-  });
+  isMuted = !isMuted;
+  audioTrack.enabled = !isMuted;
 
   document.getElementById("micBtn").innerText =
     isMuted ? "🔇 Mic OFF" : "🎤 Mic ON";
@@ -140,16 +158,18 @@ async function startShare() {
   });
 
   const screenTrack = screenStream.getVideoTracks()[0];
+  videoTrack = screenTrack;
+
+  localStream = new MediaStream([videoTrack]);
+  addVideo(localStream, "me");
 
   for (let id in peers) {
     const sender = peers[id]
       .getSenders()
-      .find(s => s.track.kind === "video");
+      .find(s => s.track?.kind === "video");
 
-    if (sender) sender.replaceTrack(screenTrack);
+    if (sender) sender.replaceTrack(videoTrack);
   }
-
-  addVideo(screenStream, "me");
 
   screenTrack.onended = () => {
     startCamera();
@@ -160,4 +180,4 @@ function sendMessage() {
   const input = document.getElementById("msgInput");
   socket.emit("chat", input.value);
   input.value = "";
-    }
+                            }
