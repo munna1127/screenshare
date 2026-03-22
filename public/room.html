@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Room</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h2>💬 Video Room</h2>
+
+<div id="videos" class="video-grid"></div>
+
+<div class="controls">
+  <button onclick="startCamera()">🎥 Camera</button>
+  <button onclick="toggleMute()">🎤 Mute</button>
+  <button onclick="startShare()">📺 Share</button>
+</div>
+
+<div class="chat">
+  <div id="messages"></div>
+  <input id="msgInput" placeholder="Message">
+  <button onclick="sendMessage()">Send</button>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Join Room</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="center">
+  <h1>🚀 Screen Share App</h1>
+
+  <input id="room" placeholder="Enter Room ID">
+  <button onclick="join()">Join Room</button>
+</div>
+
+<script>
+function join() {
+  const room = document.getElementById("room").value;
+  window.location.href = "/room.html?room=" + room;
+}
+</script>
+
+</body>
+</html>
