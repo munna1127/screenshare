@@ -17,12 +17,13 @@ input {
 }
 
 button {
-  padding: 10px 15px;
-  margin: 5px;
-  border-radius: 8px;
+  padding: 12px 18px;
+  margin: 8px;
+  border-radius: 10px;
   border: none;
   background: #38bdf8;
   cursor: pointer;
+  font-size: 16px;
 }
 
 button:hover {
@@ -33,12 +34,12 @@ button:hover {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap: 15px;
 }
 
 video {
-  width: 250px;
-  border-radius: 10px;
+  width: 280px;
+  border-radius: 12px;
   background: black;
 }
 
@@ -56,4 +57,5 @@ video {
   overflow-y: scroll;
   background: #1e293b;
   padding: 10px;
+  border-radius: 10px;
 }
