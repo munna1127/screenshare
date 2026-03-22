@@ -6,7 +6,6 @@ body {
   text-align: center;
 }
 
-/* GLASS EFFECT */
 .glass {
   background: rgba(255,255,255,0.08);
   backdrop-filter: blur(10px);
@@ -15,69 +14,44 @@ body {
   margin: 15px;
 }
 
-/* CENTER */
 .center {
   margin-top: 100px;
 }
 
-/* TITLE */
-.title {
-  font-size: 24px;
-  text-shadow: 0 0 10px #38bdf8;
-}
-
-.room {
-  color: #38bdf8;
-}
-
-/* BUTTONS */
 button {
-  padding: 12px 18px;
-  margin: 8px;
+  padding: 12px;
+  margin: 6px;
   border-radius: 10px;
   border: none;
   background: #38bdf8;
-  color: black;
-  font-weight: bold;
   cursor: pointer;
-  transition: 0.3s;
 }
 
 button:hover {
   background: #0ea5e9;
-  box-shadow: 0 0 15px #38bdf8;
 }
 
-/* INPUT */
 input {
   padding: 10px;
   border-radius: 8px;
   border: none;
 }
 
-/* VIDEO GRID */
 .video-grid {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 15px;
+  gap: 10px;
 }
 
 video {
-  width: 260px;
-  border-radius: 12px;
+  width: 250px;
+  border-radius: 10px;
   background: black;
-  box-shadow: 0 0 10px #38bdf8;
 }
 
-/* CONTROLS */
-.controls {
-  margin: 20px auto;
-}
-
-/* CHAT */
 .chat {
-  width: 320px;
+  width: 300px;
   margin: auto;
 }
 
@@ -86,12 +60,4 @@ video {
   overflow-y: auto;
   background: #020617;
   padding: 10px;
-  border-radius: 10px;
-  text-align: left;
-}
-
-/* FOOTER */
-.tag {
-  margin-top: 20px;
-  color: #38bdf8;
 }
