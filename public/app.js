@@ -3,21 +3,21 @@ const socket = io();
 const params = new URLSearchParams(window.location.search);
 const room = params.get("room");
 
-const username = localStorage.getItem("username") || "User";
+let username = localStorage.getItem("username") || "User";
 
 document.getElementById("roomId").innerText = "Room: " + room;
 
 let peers = {};
 let localStream;
 
-// STATUS FIX
+// STATUS
 socket.on("connect", () => {
   const status = document.getElementById("status");
   if (status) status.innerText = "🟢 Connected";
 });
 
-// join
-socket.emit("join-room", room);
+// JOIN WITH NAME
+socket.emit("join-room", { room, username });
 
 // CAMERA
 async function startCamera() {
@@ -46,6 +46,7 @@ function addVideo(stream, id, name) {
     const video = document.createElement("video");
     video.autoplay = true;
     video.playsInline = true;
+    video.muted = id === "me";
 
     video.onclick = () => {
       if (video.requestFullscreen) video.requestFullscreen();
@@ -66,17 +67,18 @@ function addVideo(stream, id, name) {
 
 // CAMERA OFF
 function showCameraOff(id, name) {
-  let box = document.createElement("div");
+  const box = document.createElement("div");
   box.className = "video-box";
   box.innerHTML = `<div class="camera-off">📷 OFF</div>`;
   document.getElementById("videos").appendChild(box);
 }
 
-// PEER
-socket.on("user-joined", userId => {
-  createPeer(userId, true);
+// USER JOIN
+socket.on("user-joined", ({ userId, username }) => {
+  createPeer(userId, true, username);
 });
 
+// SIGNAL
 socket.on("signal", async ({ userId, data }) => {
   if (!peers[userId]) createPeer(userId, false);
 
@@ -104,7 +106,7 @@ socket.on("signal", async ({ userId, data }) => {
 });
 
 // CREATE PEER
-function createPeer(userId, initiator) {
+function createPeer(userId, initiator, name = "User") {
   const peer = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
   });
@@ -118,9 +120,8 @@ function createPeer(userId, initiator) {
   }
 
   peer.ontrack = e => {
-    if (e.streams && e.streams[0]) {
-      addVideo(e.streams[0], userId, "User");
-    }
+    const stream = e.streams[0];
+    addVideo(stream, userId, name);
   };
 
   peer.onicecandidate = e => {
@@ -154,7 +155,7 @@ function toggleMute() {
   localStream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
 }
 
-// SCREEN SHARE
+// SHARE
 async function startShare() {
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -177,14 +178,10 @@ async function startShare() {
   }
 }
 
-// COPY LINK
+// COPY
 function copyLink() {
-  try {
-    navigator.clipboard.writeText(window.location.href);
-    alert("Link copied!");
-  } catch {
-    alert("Copy failed");
-  }
+  navigator.clipboard.writeText(window.location.href)
+    .then(() => alert("Link copied!"));
 }
 
 // CHAT
@@ -199,32 +196,6 @@ function sendMessage() {
   socket.emit("chat", username + ": " + input.value);
   input.value = "";
 }
-
-// SPEAKING EFFECT (SAFE)
-navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-  const ctx = new AudioContext();
-  const analyser = ctx.createAnalyser();
-  const mic = ctx.createMediaStreamSource(stream);
-
-  mic.connect(analyser);
-  analyser.fftSize = 256;
-
-  const data = new Uint8Array(analyser.frequencyBinCount);
-
-  function detect() {
-    analyser.getByteFrequencyData(data);
-    const volume = data.reduce((a, b) => a + b) / data.length;
-
-    const box = document.getElementById("me");
-    if (box) {
-      box.style.boxShadow = volume > 30 ? "0 0 20px #00f" : "none";
-    }
-
-    requestAnimationFrame(detect);
-  }
-
-  detect();
-});
 
 // START
 startCamera();
