@@ -8,28 +8,113 @@ const username = localStorage.getItem("username") || "User";
 document.getElementById("roomId").innerText = "Room: " + room;
 
 let peers = {};
-let users = {};
-
 let videoTrack, audioTrack;
-
-// status
-socket.on("connect", () => {
-  document.getElementById("status").innerText = "🟢 Connected";
-});
+let analyser, dataArray;
 
 // join
 socket.emit("join-room", room);
 
-// add self
-addUser(socket.id, username);
+// ===== VIDEO ADD =====
+function addVideo(stream, id, name = "User") {
+  let box = document.getElementById(id);
 
-// user join
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "video-box";
+    box.id = id;
+
+    const video = document.createElement("video");
+    video.autoplay = true;
+
+    const label = document.createElement("div");
+    label.className = "username";
+    label.innerText = name;
+
+    box.appendChild(video);
+    box.appendChild(label);
+
+    document.getElementById("videos").appendChild(box);
+  }
+
+  const video = box.querySelector("video");
+  video.srcObject = stream;
+
+  detectSpeaking(stream, box);
+}
+
+// ===== CAMERA =====
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    });
+
+    videoTrack = stream.getVideoTracks()[0];
+    audioTrack = stream.getAudioTracks()[0];
+
+    addVideo(stream, "me", username);
+
+  } catch {
+    showCameraOff("me", username);
+  }
+}
+
+// ===== CAMERA OFF =====
+function showCameraOff(id, name) {
+  let box = document.getElementById(id);
+
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "video-box";
+    box.id = id;
+
+    const off = document.createElement("div");
+    off.className = "camera-off";
+    off.innerText = "📷 OFF";
+
+    const label = document.createElement("div");
+    label.className = "username";
+    label.innerText = name;
+
+    box.appendChild(off);
+    box.appendChild(label);
+
+    document.getElementById("videos").appendChild(box);
+  }
+}
+
+// ===== SPEAKING DETECT =====
+function detectSpeaking(stream, box) {
+  const audioCtx = new AudioContext();
+  analyser = audioCtx.createAnalyser();
+
+  const mic = audioCtx.createMediaStreamSource(stream);
+  mic.connect(analyser);
+
+  dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+  function check() {
+    analyser.getByteFrequencyData(dataArray);
+    const volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
+
+    if (volume > 20) {
+      box.classList.add("speaking");
+    } else {
+      box.classList.remove("speaking");
+    }
+
+    requestAnimationFrame(check);
+  }
+
+  check();
+}
+
+// ===== PEER =====
 socket.on("user-joined", userId => {
   createPeer(userId, true);
-  addUser(userId, "User");
 });
 
-// signal
 socket.on("signal", async ({ userId, data }) => {
   if (!peers[userId]) createPeer(userId, false);
 
@@ -54,16 +139,10 @@ socket.on("signal", async ({ userId, data }) => {
   }
 });
 
-// create peer
 function createPeer(userId, initiator) {
   const peer = new RTCPeerConnection({
     iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      {
-        urls: "turn:openrelay.metered.ca:80",
-        username: "openrelayproject",
-        credential: "openrelayproject"
-      }
+      { urls: "stun:stun.l.google.com:19302" }
     ]
   });
 
@@ -94,85 +173,18 @@ function createPeer(userId, initiator) {
   }
 }
 
-// video
-function addVideo(stream, id) {
-  let video = document.getElementById(id);
-
-  if (!video) {
-    video = document.createElement("video");
-    video.id = id;
-    video.autoplay = true;
-    video.onclick = () => video.requestFullscreen();
-    document.getElementById("videos").appendChild(video);
-  }
-
-  video.srcObject = stream;
-}
-
-// camera
-async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: true,
-    audio: true
-  });
-
-  videoTrack = stream.getVideoTracks()[0];
-  audioTrack = stream.getAudioTracks()[0];
-
-  addVideo(new MediaStream([videoTrack, audioTrack]), "me");
-}
-
-// toggle
+// ===== TOGGLE =====
 function toggleCamera() {
-  if (videoTrack) videoTrack.enabled = !videoTrack.enabled;
+  if (videoTrack) {
+    videoTrack.enabled = !videoTrack.enabled;
+  }
 }
 
 function toggleMute() {
-  if (audioTrack) audioTrack.enabled = !audioTrack.enabled;
-}
-
-// share
-async function startShare() {
-  if (!navigator.mediaDevices.getDisplayMedia) {
-    alert("Not supported on mobile");
-    return;
-  }
-
-  const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-  videoTrack = stream.getVideoTracks()[0];
-
-  addVideo(new MediaStream([videoTrack]), "me");
-}
-
-// chat
-socket.on("chat", msg => {
-  const div = document.createElement("div");
-  div.innerText = msg;
-  document.getElementById("messages").appendChild(div);
-});
-
-function sendMessage() {
-  const input = document.getElementById("msgInput");
-  socket.emit("chat", username + ": " + input.value);
-  input.value = "";
-}
-
-// users
-function addUser(id, name) {
-  users[id] = name;
-
-  const ul = document.getElementById("users");
-  ul.innerHTML = "";
-
-  for (let uid in users) {
-    const li = document.createElement("li");
-    li.innerText = users[uid];
-    ul.appendChild(li);
+  if (audioTrack) {
+    audioTrack.enabled = !audioTrack.enabled;
   }
 }
 
-// copy link
-function copyLink() {
-  navigator.clipboard.writeText(window.location.href);
-  alert("Link copied!");
-                  }
+// ===== START =====
+startCamera();
