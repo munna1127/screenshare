@@ -13,18 +13,26 @@ app.use(express.static("public"));
 
 io.on("connection", socket => {
 
-  socket.on("join-room", room => {
+  socket.on("join-room", ({ room, username }) => {
     socket.join(room);
+
+    socket.username = username;
 
     const users = Array.from(io.sockets.adapter.rooms.get(room) || []);
 
     users.forEach(userId => {
       if (userId !== socket.id) {
-        socket.emit("user-joined", userId);
+        socket.emit("user-joined", {
+          userId,
+          username: io.sockets.sockets.get(userId)?.username || "User"
+        });
       }
     });
 
-    socket.to(room).emit("user-joined", socket.id);
+    socket.to(room).emit("user-joined", {
+      userId: socket.id,
+      username
+    });
 
     socket.on("signal", ({ userId, data }) => {
       io.to(userId).emit("signal", {
