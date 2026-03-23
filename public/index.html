@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Tomar Ji App</title>
+  <title>🔥 Tomar Ji Live</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="center glass">
-  <h1>🔥 Tomar Ji Screen Share</h1>
+<div style="margin-top:100px">
+  <h1>🔥 Tomar Ji Video Call</h1>
 
-  <input id="nameInput" placeholder="Enter Your Name">
+  <input id="nameInput" placeholder="Enter your name">
 
   <br><br>
 
@@ -19,26 +19,34 @@
 
   <input id="roomInput" placeholder="Enter Room ID">
   <button onclick="joinRoom()">🔗 Join Room</button>
+
+  <p style="color:#38bdf8;">⚡ Fast • Secure • Premium</p>
 </div>
 
 <script>
-function createRoom() {
+function saveName() {
   const name = document.getElementById("nameInput").value;
-  if (!name) return alert("Enter name");
-
+  if (!name) {
+    alert("Enter your name");
+    return null;
+  }
   localStorage.setItem("username", name);
+  return name;
+}
+
+function createRoom() {
+  const name = saveName();
+  if (!name) return;
 
   const roomId = Math.random().toString(36).substring(2, 8);
   window.location.href = "/room.html?room=" + roomId;
 }
 
 function joinRoom() {
-  const name = document.getElementById("nameInput").value;
+  const name = saveName();
   const room = document.getElementById("roomInput").value;
 
-  if (!name || !room) return alert("Enter all details");
-
-  localStorage.setItem("username", name);
+  if (!name || !room) return;
 
   window.location.href = "/room.html?room=" + room;
 }
