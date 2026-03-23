@@ -8,13 +8,27 @@ const username = localStorage.getItem("username") || "User";
 document.getElementById("roomId").innerText = "Room: " + room;
 
 let peers = {};
-let videoTrack, audioTrack;
-let analyser, dataArray;
+let localStream;
 
-// join
+// join room
 socket.emit("join-room", room);
 
-// ===== VIDEO ADD =====
+// ===== START CAMERA =====
+async function startCamera() {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    });
+
+    addVideo(localStream, "me", username);
+
+  } catch (e) {
+    showCameraOff("me", username);
+  }
+}
+
+// ===== ADD VIDEO =====
 function addVideo(stream, id, name = "User") {
   let box = document.getElementById(id);
 
@@ -25,6 +39,7 @@ function addVideo(stream, id, name = "User") {
 
     const video = document.createElement("video");
     video.autoplay = true;
+    video.playsInline = true;
 
     const label = document.createElement("div");
     label.className = "username";
@@ -38,26 +53,6 @@ function addVideo(stream, id, name = "User") {
 
   const video = box.querySelector("video");
   video.srcObject = stream;
-
-  detectSpeaking(stream, box);
-}
-
-// ===== CAMERA =====
-async function startCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    });
-
-    videoTrack = stream.getVideoTracks()[0];
-    audioTrack = stream.getAudioTracks()[0];
-
-    addVideo(stream, "me", username);
-
-  } catch {
-    showCameraOff("me", username);
-  }
 }
 
 // ===== CAMERA OFF =====
@@ -71,7 +66,7 @@ function showCameraOff(id, name) {
 
     const off = document.createElement("div");
     off.className = "camera-off";
-    off.innerText = "📷 OFF";
+    off.innerText = "📷 Camera OFF";
 
     const label = document.createElement("div");
     label.className = "username";
@@ -84,33 +79,7 @@ function showCameraOff(id, name) {
   }
 }
 
-// ===== SPEAKING DETECT =====
-function detectSpeaking(stream, box) {
-  const audioCtx = new AudioContext();
-  analyser = audioCtx.createAnalyser();
-
-  const mic = audioCtx.createMediaStreamSource(stream);
-  mic.connect(analyser);
-
-  dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-  function check() {
-    analyser.getByteFrequencyData(dataArray);
-    const volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
-
-    if (volume > 20) {
-      box.classList.add("speaking");
-    } else {
-      box.classList.remove("speaking");
-    }
-
-    requestAnimationFrame(check);
-  }
-
-  check();
-}
-
-// ===== PEER =====
+// ===== PEER CONNECTION =====
 socket.on("user-joined", userId => {
   createPeer(userId, true);
 });
@@ -135,10 +104,13 @@ socket.on("signal", async ({ userId, data }) => {
   }
 
   if (data.candidate) {
-    await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+    try {
+      await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+    } catch {}
   }
 });
 
+// ===== CREATE PEER =====
 function createPeer(userId, initiator) {
   const peer = new RTCPeerConnection({
     iceServers: [
@@ -148,10 +120,16 @@ function createPeer(userId, initiator) {
 
   peers[userId] = peer;
 
-  if (videoTrack) peer.addTrack(videoTrack);
-  if (audioTrack) peer.addTrack(audioTrack);
+  // add stream safely
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      peer.addTrack(track, localStream);
+    });
+  }
 
-  peer.ontrack = e => addVideo(e.streams[0], userId);
+  peer.ontrack = e => {
+    addVideo(e.streams[0], userId);
+  };
 
   peer.onicecandidate = e => {
     if (e.candidate) {
@@ -173,17 +151,51 @@ function createPeer(userId, initiator) {
   }
 }
 
-// ===== TOGGLE =====
+// ===== CONTROLS =====
 function toggleCamera() {
-  if (videoTrack) {
-    videoTrack.enabled = !videoTrack.enabled;
-  }
+  if (!localStream) return;
+  localStream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
 }
 
 function toggleMute() {
-  if (audioTrack) {
-    audioTrack.enabled = !audioTrack.enabled;
+  if (!localStream) return;
+  localStream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
+}
+
+// ===== SCREEN SHARE (SAFE) =====
+async function startShare() {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true
+    });
+
+    const screenTrack = stream.getVideoTracks()[0];
+
+    for (let id in peers) {
+      const sender = peers[id].getSenders().find(s => s.track?.kind === "video");
+      if (sender) sender.replaceTrack(screenTrack);
+    }
+
+    addVideo(stream, "me", username);
+
+    screenTrack.onended = () => startCamera();
+
+  } catch {
+    alert("Screen share not supported");
   }
+}
+
+// ===== CHAT =====
+socket.on("chat", msg => {
+  const div = document.createElement("div");
+  div.innerText = msg;
+  document.getElementById("messages").appendChild(div);
+});
+
+function sendMessage() {
+  const input = document.getElementById("msgInput");
+  socket.emit("chat", username + ": " + input.value);
+  input.value = "";
 }
 
 // ===== START =====
