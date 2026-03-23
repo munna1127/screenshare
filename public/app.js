@@ -10,10 +10,16 @@ document.getElementById("roomId").innerText = "Room: " + room;
 let peers = {};
 let localStream;
 
-// join room
+// join
 socket.emit("join-room", room);
 
-// ===== START CAMERA =====
+// status fix
+socket.on("connect", () => {
+  const status = document.getElementById("status");
+  if (status) status.innerText = "🟢 Connected";
+});
+
+// ===== CAMERA START =====
 async function startCamera() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
@@ -23,7 +29,7 @@ async function startCamera() {
 
     addVideo(localStream, "me", username);
 
-  } catch (e) {
+  } catch {
     showCameraOff("me", username);
   }
 }
@@ -40,6 +46,15 @@ function addVideo(stream, id, name = "User") {
     const video = document.createElement("video");
     video.autoplay = true;
     video.playsInline = true;
+
+    // 🔥 FULLSCREEN (DOUBLE TAP)
+    video.ondblclick = () => {
+      if (video.requestFullscreen) {
+        video.requestFullscreen();
+      } else if (video.webkitRequestFullscreen) {
+        video.webkitRequestFullscreen();
+      }
+    };
 
     const label = document.createElement("div");
     label.className = "username";
@@ -79,7 +94,7 @@ function showCameraOff(id, name) {
   }
 }
 
-// ===== PEER CONNECTION =====
+// ===== PEER =====
 socket.on("user-joined", userId => {
   createPeer(userId, true);
 });
@@ -120,7 +135,6 @@ function createPeer(userId, initiator) {
 
   peers[userId] = peer;
 
-  // add stream safely
   if (localStream) {
     localStream.getTracks().forEach(track => {
       peer.addTrack(track, localStream);
@@ -151,7 +165,7 @@ function createPeer(userId, initiator) {
   }
 }
 
-// ===== CONTROLS =====
+// ===== TOGGLE =====
 function toggleCamera() {
   if (!localStream) return;
   localStream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
@@ -162,26 +176,42 @@ function toggleMute() {
   localStream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
 }
 
-// ===== SCREEN SHARE (SAFE) =====
+// ===== SCREEN SHARE =====
 async function startShare() {
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: true
     });
 
-    const screenTrack = stream.getVideoTracks()[0];
+    const track = stream.getVideoTracks()[0];
 
     for (let id in peers) {
       const sender = peers[id].getSenders().find(s => s.track?.kind === "video");
-      if (sender) sender.replaceTrack(screenTrack);
+      if (sender) sender.replaceTrack(track);
     }
 
     addVideo(stream, "me", username);
 
-    screenTrack.onended = () => startCamera();
+    track.onended = () => startCamera();
 
   } catch {
     alert("Screen share not supported");
+  }
+}
+
+// ===== COPY LINK =====
+function copyLink() {
+  try {
+    navigator.clipboard.writeText(window.location.href);
+    alert("Link copied!");
+  } catch {
+    const input = document.createElement("input");
+    input.value = window.location.href;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand("copy");
+    document.body.removeChild(input);
+    alert("Link copied!");
   }
 }
 
@@ -198,5 +228,5 @@ function sendMessage() {
   input.value = "";
 }
 
-// ===== START =====
+// start
 startCamera();
