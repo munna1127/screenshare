@@ -8,7 +8,7 @@ let localStream;
 
 socket.emit("join-room", room);
 
-// CAMERA
+// ===== CAMERA =====
 async function startCamera() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
@@ -23,7 +23,7 @@ async function startCamera() {
   }
 }
 
-// ADD VIDEO
+// ===== ADD VIDEO =====
 function addVideo(stream, id, name) {
   let box = document.getElementById(id);
 
@@ -36,7 +36,7 @@ function addVideo(stream, id, name) {
     video.autoplay = true;
     video.playsInline = true;
 
-    // 🔥 FULLSCREEN
+    // FULLSCREEN
     video.onclick = () => {
       if (video.requestFullscreen) video.requestFullscreen();
     };
@@ -51,18 +51,39 @@ function addVideo(stream, id, name) {
   }
 
   const video = box.querySelector("video");
+
+  video.srcObject = null;
   video.srcObject = stream;
+
+  video.onloadedmetadata = () => {
+    video.play().catch(() => {});
+  };
 }
 
-// CAMERA OFF
+// ===== CAMERA OFF =====
 function showCameraOff(id, name) {
-  const box = document.createElement("div");
-  box.className = "video-box";
-  box.innerHTML = `<div class="camera-off">📷 OFF</div>`;
-  document.getElementById("videos").appendChild(box);
+  let box = document.getElementById(id);
+
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "video-box";
+    box.id = id;
+
+    const off = document.createElement("div");
+    off.className = "camera-off";
+    off.innerText = "📷 Camera OFF";
+
+    const label = document.createElement("div");
+    label.className = "username";
+    label.innerText = name;
+
+    box.appendChild(off);
+    box.appendChild(label);
+    document.getElementById("videos").appendChild(box);
+  }
 }
 
-// PEER
+// ===== PEER =====
 socket.on("user-joined", userId => {
   createPeer(userId, true);
 });
@@ -87,11 +108,13 @@ socket.on("signal", async ({ userId, data }) => {
   }
 
   if (data.candidate) {
-    await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+    try {
+      await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+    } catch {}
   }
 });
 
-// CREATE PEER
+// ===== CREATE PEER =====
 function createPeer(userId, initiator) {
   const peer = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
@@ -99,12 +122,16 @@ function createPeer(userId, initiator) {
 
   peers[userId] = peer;
 
-  localStream.getTracks().forEach(track => {
-    peer.addTrack(track, localStream);
-  });
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      peer.addTrack(track, localStream);
+    });
+  }
 
   peer.ontrack = e => {
-    addVideo(e.streams[0], userId, "User");
+    if (e.streams && e.streams[0]) {
+      addVideo(e.streams[0], userId, "User");
+    }
   };
 
   peer.onicecandidate = e => {
@@ -127,7 +154,59 @@ function createPeer(userId, initiator) {
   }
 }
 
-// 🔥 SPEAKING EFFECT ALL USERS
+// ===== TOGGLE =====
+function toggleCamera() {
+  localStream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
+}
+
+function toggleMute() {
+  localStream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
+}
+
+// ===== SCREEN SHARE =====
+async function startShare() {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true
+    });
+
+    const track = stream.getVideoTracks()[0];
+
+    for (let id in peers) {
+      const sender = peers[id].getSenders().find(s => s.track?.kind === "video");
+      if (sender) sender.replaceTrack(track);
+    }
+
+    addVideo(stream, "me", username);
+
+    track.onended = () => startCamera();
+
+  } catch {
+    alert("Screen share not supported on this device");
+  }
+}
+
+// ===== COPY LINK =====
+function copyLink() {
+  navigator.clipboard.writeText(window.location.href)
+    .then(() => alert("Link copied"))
+    .catch(() => alert("Copy failed"));
+}
+
+// ===== CHAT =====
+socket.on("chat", msg => {
+  const div = document.createElement("div");
+  div.innerText = msg;
+  document.getElementById("messages").appendChild(div);
+});
+
+function sendMessage() {
+  const input = document.getElementById("msgInput");
+  socket.emit("chat", username + ": " + input.value);
+  input.value = "";
+}
+
+// ===== SPEAKING EFFECT =====
 navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
   const ctx = new AudioContext();
   const analyser = ctx.createAnalyser();
@@ -144,8 +223,7 @@ navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
 
     const box = document.getElementById("me");
     if (box) {
-      if (volume > 30) box.classList.add("active");
-      else box.classList.remove("active");
+      box.style.boxShadow = volume > 30 ? "0 0 20px #00f" : "none";
     }
 
     requestAnimationFrame(detect);
@@ -153,19 +231,6 @@ navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
 
   detect();
 });
-
-// CHAT
-socket.on("chat", msg => {
-  const div = document.createElement("div");
-  div.innerText = msg;
-  document.getElementById("messages").appendChild(div);
-});
-
-function sendMessage() {
-  const input = document.getElementById("msgInput");
-  socket.emit("chat", username + ": " + input.value);
-  input.value = "";
-}
 
 // START
 startCamera();
