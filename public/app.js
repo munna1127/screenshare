@@ -1,14 +1,25 @@
 const socket = io();
+
 const params = new URLSearchParams(window.location.search);
 const room = params.get("room");
+
 const username = localStorage.getItem("username") || "User";
+
+document.getElementById("roomId").innerText = "Room: " + room;
 
 let peers = {};
 let localStream;
 
+// STATUS FIX
+socket.on("connect", () => {
+  const status = document.getElementById("status");
+  if (status) status.innerText = "🟢 Connected";
+});
+
+// join
 socket.emit("join-room", room);
 
-// ===== CAMERA =====
+// CAMERA
 async function startCamera() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
@@ -23,7 +34,7 @@ async function startCamera() {
   }
 }
 
-// ===== ADD VIDEO =====
+// ADD VIDEO
 function addVideo(stream, id, name) {
   let box = document.getElementById(id);
 
@@ -36,7 +47,6 @@ function addVideo(stream, id, name) {
     video.autoplay = true;
     video.playsInline = true;
 
-    // FULLSCREEN
     video.onclick = () => {
       if (video.requestFullscreen) video.requestFullscreen();
     };
@@ -51,39 +61,18 @@ function addVideo(stream, id, name) {
   }
 
   const video = box.querySelector("video");
-
-  video.srcObject = null;
   video.srcObject = stream;
-
-  video.onloadedmetadata = () => {
-    video.play().catch(() => {});
-  };
 }
 
-// ===== CAMERA OFF =====
+// CAMERA OFF
 function showCameraOff(id, name) {
-  let box = document.getElementById(id);
-
-  if (!box) {
-    box = document.createElement("div");
-    box.className = "video-box";
-    box.id = id;
-
-    const off = document.createElement("div");
-    off.className = "camera-off";
-    off.innerText = "📷 Camera OFF";
-
-    const label = document.createElement("div");
-    label.className = "username";
-    label.innerText = name;
-
-    box.appendChild(off);
-    box.appendChild(label);
-    document.getElementById("videos").appendChild(box);
-  }
+  let box = document.createElement("div");
+  box.className = "video-box";
+  box.innerHTML = `<div class="camera-off">📷 OFF</div>`;
+  document.getElementById("videos").appendChild(box);
 }
 
-// ===== PEER =====
+// PEER
 socket.on("user-joined", userId => {
   createPeer(userId, true);
 });
@@ -114,7 +103,7 @@ socket.on("signal", async ({ userId, data }) => {
   }
 });
 
-// ===== CREATE PEER =====
+// CREATE PEER
 function createPeer(userId, initiator) {
   const peer = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
@@ -154,16 +143,18 @@ function createPeer(userId, initiator) {
   }
 }
 
-// ===== TOGGLE =====
+// TOGGLE
 function toggleCamera() {
+  if (!localStream) return;
   localStream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
 }
 
 function toggleMute() {
+  if (!localStream) return;
   localStream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
 }
 
-// ===== SCREEN SHARE =====
+// SCREEN SHARE
 async function startShare() {
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -182,18 +173,21 @@ async function startShare() {
     track.onended = () => startCamera();
 
   } catch {
-    alert("Screen share not supported on this device");
+    alert("Screen share not supported");
   }
 }
 
-// ===== COPY LINK =====
+// COPY LINK
 function copyLink() {
-  navigator.clipboard.writeText(window.location.href)
-    .then(() => alert("Link copied"))
-    .catch(() => alert("Copy failed"));
+  try {
+    navigator.clipboard.writeText(window.location.href);
+    alert("Link copied!");
+  } catch {
+    alert("Copy failed");
+  }
 }
 
-// ===== CHAT =====
+// CHAT
 socket.on("chat", msg => {
   const div = document.createElement("div");
   div.innerText = msg;
@@ -206,7 +200,7 @@ function sendMessage() {
   input.value = "";
 }
 
-// ===== SPEAKING EFFECT =====
+// SPEAKING EFFECT (SAFE)
 navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
   const ctx = new AudioContext();
   const analyser = ctx.createAnalyser();
